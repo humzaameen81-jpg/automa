@@ -258,7 +258,7 @@ jobs:
           rm patch-manifest.js
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build extension
         run: npm run build
