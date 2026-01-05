@@ -256,11 +256,11 @@ jobs:
 
           node patch-manifest.js
           rm patch-manifest.js
-          
-- name: Force Ajv versions for webpack toolchain
-  run: |
-    npm pkg set overrides.ajv=8.12.0
-    npm pkg set overrides.ajv-keywords=5.1.0
+
+      - name: Force Ajv versions for webpack toolchain
+        run: |
+          npm pkg set overrides.ajv=8.12.0
+          npm pkg set overrides.ajv-keywords=5.1.0
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
