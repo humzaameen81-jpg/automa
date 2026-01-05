@@ -270,44 +270,40 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Locating built extension folder..."
+          echo "📦 Locating built extension folder (by manifest*.json)..."
 
-          # Find manifest in typical BUILD output folders only
-          MANIFEST_PATH=$(find . -maxdepth 15 -type f \
+          echo "Top-level folders:"
+          ls -la
+
+          echo "Searching for manifest*.json (depth 12)..."
+          MANIFEST_PATH=$(find . -maxdepth 12 -type f \
             \( -name "manifest.json" -o -name "manifest.*.json" -o -name "manifest_*.json" \) \
             -not -path "./node_modules/*" \
             -not -path "./.git/*" \
-            -not -path "./src/*" \
-            -not -path "./business/*" \
-            | grep -E "./(dist|build|release|out|output)/" \
             | head -n 1)
 
           if [ -z "$MANIFEST_PATH" ]; then
-            echo "❌ No manifest found inside dist/build/release/out/output."
-            echo "Here are all manifest-like files found (excluding node_modules):"
-            find . -maxdepth 15 -type f -iname "*manifest*.json" \
-              -not -path "./node_modules/*" \
-              -not -path "./.git/*" \
-              | head -n 50
-            echo ""
-            echo "Here are folders that exist (depth 3):"
-            find . -maxdepth 3 -type d -print
+            echo "❌ No manifest file found after build."
+            echo "Listing any manifest-like files:"
+            find . -maxdepth 12 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print
+            echo "Listing likely output folders:"
+            find . -maxdepth 5 -type d \( -name dist -o -name build -o -name out -o -name output -o -name release \) -print
             exit 1
           fi
 
           OUTDIR=$(dirname "$MANIFEST_PATH")
-          echo "✅ Found build manifest at: $MANIFEST_PATH"
-          echo "✅ Zipping folder: $OUTDIR"
+          echo "✅ Found manifest file at: $MANIFEST_PATH"
+          echo "✅ Using output folder: $OUTDIR"
 
-          ZIP_NAME="automa-private-variant.zip"
-          rm -f "$ZIP_NAME"
+          echo "Contents of output folder:"
+          ls -la "$OUTDIR"
 
           cd "$OUTDIR"
-          zip -r "../../$ZIP_NAME" .
+          zip -r "../../automa-private-variant.zip" .
           cd -
 
           echo "✅ ZIP created:"
-          ls -la "$ZIP_NAME"
+          ls -la automa-private-variant.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
