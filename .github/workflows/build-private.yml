@@ -21,7 +21,7 @@ jobs:
       - name: Create localApi.js file
         run: |
           mkdir -p src/utils
-          cat > src/utils/localApi. js << 'EOF'
+          cat > src/utils/localApi.js << 'EOF'
           /**
            * Local API utilities for storing and retrieving data from localStorage
            * Replaces remote fetchApi calls with local-only operations
@@ -236,7 +236,7 @@ jobs:
           const fs = require('fs');
           const path = require('path');
 
-          const manifestPath = path.join(__dirname, 'src', 'manifest.chrome. json');
+          const manifestPath = path.join(__dirname, 'src', 'manifest.chrome.json');
           let manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
           // Remove automa.site and vercel from content scripts
