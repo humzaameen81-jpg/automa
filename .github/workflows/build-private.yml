@@ -270,21 +270,34 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Looking for build output folder..."
-          echo "Top-level folders:"
+          echo "📦 Finding build output..."
+          echo "Folders in repo root:"
           ls -la
 
-          if [ -d build ]; then OUTDIR=build;
-          elif [ -d dist ]; then OUTDIR=dist;
-          elif [ -d release ]; then OUTDIR=release;
+          # Prefer common extension output folders FIRST
+          if [ -d dist ]; then OUTDIR=dist;
+          elif [ -d build ]; then OUTDIR=build;
+          elif [ -d extension ]; then OUTDIR=extension;
+          elif [ -d output ]; then OUTDIR=output;
           else
-            echo "❌ No output folder found (build/dist/release)."
-            echo "Listing all folders recursively (depth 2):"
+            echo "❌ Could not find dist/build/extension/output."
+            echo "Here are folders (depth 2):"
             find . -maxdepth 2 -type d -print
             exit 1
           fi
 
+          # Safety check: never zip node_modules
+          if [ -d "$OUTDIR/node_modules" ]; then
+            echo "❌ '$OUTDIR' contains node_modules, so it's not the build output folder."
+            echo "Showing candidates that contain manifest.json (common in extensions):"
+            find . -maxdepth 4 -name manifest.json -print
+            exit 1
+          fi
+
           echo "✅ Using output folder: $OUTDIR"
+          echo "Contents of $OUTDIR:"
+          ls -la "$OUTDIR"
+
           cd "$OUTDIR"
           zip -r "../automa-private-variant.zip" .
           cd ..
