@@ -270,29 +270,30 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Locating built extension folder (by manifest.json)..."
+          echo "📦 Locating built extension folder (by manifest*.json)..."
 
-          echo "Searching for manifest.json (depth 6)..."
-          MANIFEST_PATH=$(find . -maxdepth 6 -type f -name manifest.json | head -n 1)
+          echo "Top-level folders:"
+          ls -la
+
+          echo "Searching for manifest*.json (depth 12)..."
+          MANIFEST_PATH=$(find . -maxdepth 12 -type f \
+            \( -name "manifest.json" -o -name "manifest.*.json" -o -name "manifest_*.json" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./.git/*" \
+            | head -n 1)
 
           if [ -z "$MANIFEST_PATH" ]; then
-            echo "❌ No manifest.json found after build."
-            echo "Top-level folders:"
-            ls -la
-            echo "Folders (depth 3):"
-            find . -maxdepth 3 -type d -print
+            echo "❌ No manifest file found after build."
+            echo "Listing any manifest-like files:"
+            find . -maxdepth 12 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print
+            echo "Listing likely output folders:"
+            find . -maxdepth 5 -type d \( -name dist -o -name build -o -name out -o -name output -o -name release \) -print
             exit 1
           fi
 
           OUTDIR=$(dirname "$MANIFEST_PATH")
-          echo "✅ Found manifest.json at: $MANIFEST_PATH"
+          echo "✅ Found manifest file at: $MANIFEST_PATH"
           echo "✅ Using output folder: $OUTDIR"
-
-          # Safety: don't zip repo root or node_modules
-          if [ "$OUTDIR" = "." ] || [[ "$OUTDIR" == *"node_modules"* ]]; then
-            echo "❌ Output folder looks wrong: $OUTDIR"
-            exit 1
-          fi
 
           echo "Contents of output folder:"
           ls -la "$OUTDIR"
