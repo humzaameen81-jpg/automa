@@ -272,10 +272,6 @@ jobs:
         run: |
           echo "📦 Locating built extension folder (by manifest*.json)..."
 
-          echo "Top-level folders:"
-          ls -la
-
-          echo "Searching for manifest*.json (depth 12)..."
           MANIFEST_PATH=$(find . -maxdepth 12 -type f \
             \( -name "manifest.json" -o -name "manifest.*.json" -o -name "manifest_*.json" \) \
             -not -path "./node_modules/*" \
@@ -284,26 +280,22 @@ jobs:
 
           if [ -z "$MANIFEST_PATH" ]; then
             echo "❌ No manifest file found after build."
-            echo "Listing any manifest-like files:"
             find . -maxdepth 12 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print
-            echo "Listing likely output folders:"
-            find . -maxdepth 5 -type d \( -name dist -o -name build -o -name out -o -name output -o -name release \) -print
             exit 1
           fi
 
           OUTDIR=$(dirname "$MANIFEST_PATH")
-          echo "✅ Found manifest file at: $MANIFEST_PATH"
           echo "✅ Using output folder: $OUTDIR"
 
-          echo "Contents of output folder:"
-          ls -la "$OUTDIR"
+          ZIP_NAME="automa-private-variant.zip"
+          rm -f "$ZIP_NAME"
 
           cd "$OUTDIR"
-          zip -r "../../automa-private-variant.zip" .
+          zip -r "../../$ZIP_NAME" .
           cd -
 
           echo "✅ ZIP created:"
-          ls -la automa-private-variant.zip
+          ls -la "$ZIP_NAME"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
