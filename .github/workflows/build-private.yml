@@ -270,9 +270,27 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          cd build
-          zip -r ../automa-private-variant.zip .
+          echo "📦 Looking for build output folder..."
+          echo "Top-level folders:"
+          ls -la
+
+          if [ -d build ]; then OUTDIR=build;
+          elif [ -d dist ]; then OUTDIR=dist;
+          elif [ -d release ]; then OUTDIR=release;
+          else
+            echo "❌ No output folder found (build/dist/release)."
+            echo "Listing all folders recursively (depth 2):"
+            find . -maxdepth 2 -type d -print
+            exit 1
+          fi
+
+          echo "✅ Using output folder: $OUTDIR"
+          cd "$OUTDIR"
+          zip -r "../automa-private-variant.zip" .
           cd ..
+
+          echo "✅ ZIP created:"
+          ls -la automa-private-variant.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
