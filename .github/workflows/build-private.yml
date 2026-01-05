@@ -270,7 +270,7 @@ jobs:
           cd .. 
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: automa-private-variant
           path: automa-private-variant.zip
