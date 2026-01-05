@@ -1,54 +1,277 @@
 name: Build Automa Private Variant
 
-on: 
-  push:
-    branches:  [main]
+on:
+  push: 
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on:  ubuntu-latest
-    
+  build: 
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      
+      - name:  Checkout code
+        uses: actions/checkout@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version:  '18'
-      
-      - name: Create localApi.js
+          node-version: '18'
+
+      - name: Create localApi.js file
         run: |
           mkdir -p src/utils
           cat > src/utils/localApi. js << 'EOF'
-          // [paste the entire localApi.js content here]
-          EOF
-      
-      - name:  Patch api.js
-        run: node -e "
-          const fs = require('fs');
-          let content = fs.readFileSync('src/utils/api.js', 'utf8');
-          if (!content.includes('USE_LOCAL_STORAGE_ONLY')) {
-            content = \"const USE_LOCAL_STORAGE_ONLY = true;\\n\" + content;
+          /**
+           * Local API utilities for storing and retrieving data from localStorage
+           * Replaces remote fetchApi calls with local-only operations
+           */
+
+          const STORAGE_KEYS = {
+            WORKFLOWS: 'automa_workflows',
+            VARIABLES: 'automa_variables',
+            TABLES: 'automa_tables',
+            PACKAGES: 'automa_packages',
+          };
+
+          export async function getWorkflows() {
+            try {
+              const data = localStorage.getItem(STORAGE_KEYS.WORKFLOWS);
+              return data ? JSON.parse(data) : [];
+            } catch (error) {
+              console.error('Error retrieving workflows:', error);
+              return [];
+            }
           }
-          fs.writeFileSync('src/utils/api.js', content);
-        "
-      
+
+          export async function saveWorkflow(id, data) {
+            try {
+              const workflows = await getWorkflows();
+              const index = workflows.findIndex(w => w.id === id);
+              const workflow = {
+                id,
+                ...data,
+                updatedAt: new Date().toISOString(),
+              };
+              if (index >= 0) {
+                workflows[index] = workflow;
+              } else {
+                workflow.createdAt = new Date().toISOString();
+                workflows.push(workflow);
+              }
+              localStorage.setItem(STORAGE_KEYS.WORKFLOWS, JSON. stringify(workflows));
+              return workflow;
+            } catch (error) {
+              console.error(`Error saving workflow ${id}:`, error);
+              throw error;
+            }
+          }
+
+          export async function deleteWorkflow(id) {
+            try {
+              const workflows = await getWorkflows();
+              const filtered = workflows.filter(w => w.id !== id);
+              if (filtered.length === workflows.length) return false;
+              localStorage.setItem(STORAGE_KEYS.WORKFLOWS, JSON.stringify(filtered));
+              return true;
+            } catch (error) {
+              console. error(`Error deleting workflow ${id}:`, error);
+              throw error;
+            }
+          }
+
+          export async function getVariables() {
+            try {
+              const data = localStorage.getItem(STORAGE_KEYS.VARIABLES);
+              return data ? JSON.parse(data) : [];
+            } catch (error) {
+              return [];
+            }
+          }
+
+          export async function saveVariable(id, data) {
+            try {
+              const variables = await getVariables();
+              const index = variables.findIndex(v => v. id === id);
+              const variable = { id, ...data, updatedAt: new Date().toISOString() };
+              if (index >= 0) {
+                variables[index] = variable;
+              } else {
+                variable.createdAt = new Date().toISOString();
+                variables.push(variable);
+              }
+              localStorage.setItem(STORAGE_KEYS.VARIABLES, JSON.stringify(variables));
+              return variable;
+            } catch (error) {
+              throw error;
+            }
+          }
+
+          export async function getTables() {
+            try {
+              const data = localStorage.getItem(STORAGE_KEYS. TABLES);
+              return data ? JSON.parse(data) : [];
+            } catch (error) {
+              return [];
+            }
+          }
+
+          export async function saveTable(id, data) {
+            try {
+              const tables = await getTables();
+              const index = tables.findIndex(t => t.id === id);
+              const table = { id, ...data, updatedAt: new Date().toISOString() };
+              if (index >= 0) {
+                tables[index] = table;
+              } else {
+                table.createdAt = new Date().toISOString();
+                tables.push(table);
+              }
+              localStorage.setItem(STORAGE_KEYS.TABLES, JSON.stringify(tables));
+              return table;
+            } catch (error) {
+              throw error;
+            }
+          }
+
+          export async function exportData() {
+            return {
+              workflows: await getWorkflows(),
+              variables: await getVariables(),
+              tables: await getTables(),
+              exportedAt: new Date().toISOString(),
+            };
+          }
+
+          export async function importData(data, merge = true) {
+            try {
+              if (data.workflows) {
+                const workflows = merge ? await getWorkflows() : [];
+                const merged = [... workflows, ...data.workflows];
+                localStorage.setItem(STORAGE_KEYS.WORKFLOWS, JSON.stringify(merged));
+              }
+              if (data.variables) {
+                const variables = merge ? await getVariables() : [];
+                const merged = [...variables, ...data. variables];
+                localStorage.setItem(STORAGE_KEYS. VARIABLES, JSON.stringify(merged));
+              }
+              return true;
+            } catch (error) {
+              throw error;
+            }
+          }
+
+          export default {
+            getWorkflows,
+            saveWorkflow,
+            deleteWorkflow,
+            getVariables,
+            saveVariable,
+            getTables,
+            saveTable,
+            exportData,
+            importData,
+          };
+          EOF
+
+      - name:  Patch api.js to disable cloud connectivity
+        run: |
+          cat > patch-api.js << 'PATCHEOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const apiFile = path.join(__dirname, 'src', 'utils', 'api.js');
+          let content = fs.readFileSync(apiFile, 'utf8');
+
+          // Add private mode flag at the top
+          if (!content.includes('USE_LOCAL_STORAGE_ONLY')) {
+            const lines = content.split('\n');
+            lines.unshift('const USE_LOCAL_STORAGE_ONLY = true; // 🔒 Private Mode:  No cloud API calls');
+            lines.unshift("import localApi from '@/utils/localApi';");
+            content = lines.join('\n');
+
+            // Replace fetchApi to prevent remote calls
+            content = content.replace(
+              /export async function fetchApi\(url, options = \{\}\) \{[\s\S]*?(? =\n\nexport|$)/,
+              `export async function fetchApi(url, options = {}) {
+                if (USE_LOCAL_STORAGE_ONLY) {
+                  console.warn('🔒 PRIVATE MODE: Blocking remote API call to ' + url);
+                  if (url.includes('/me/workflows')) return { ok: true, json: async () => [] };
+                  if (url. includes('/me/packages')) return { ok: true, json: async () => [] };
+                  if (url.includes('/teams')) return { ok: true, json:  async () => [] };
+                  return { ok: false, status: 403, statusText: 'Private mode enabled' };
+                }
+              }`
+            );
+
+            // Replace fetchGapi to block Google API calls from dashboard
+            content = content.replace(
+              /export async function fetchGapi\([\s\S]*?\) \{[\s\S]*?(?=\n\nexport|$)/,
+              `export async function fetchGapi(url) {
+                console.warn('🔒 PRIVATE MODE: Google API call blocked:  ' + url);
+                throw new Error('Google API calls disabled in private mode.  Use Google Sheets/Drive blocks directly in workflows.');
+              }`
+            );
+
+            // Stub out validateOauthToken
+            content = content.replace(
+              /export function validateOauthToken\(\) \{[\s\S]*?(?=\n\nexport|$)/,
+              `export function validateOauthToken() {
+                console.warn('🔒 PRIVATE MODE: OAuth validation disabled');
+                return null;
+              }`
+            );
+
+            fs.writeFileSync(apiFile, content, 'utf8');
+            console.log('✅ Patched api.js successfully');
+          }
+          PATCHEOF
+          
+          node patch-api.js
+          rm patch-api.js
+
+      - name: Patch manifest to remove automa. site
+        run: |
+          cat > patch-manifest.js << 'MANIFESTEOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const manifestPath = path.join(__dirname, 'src', 'manifest.chrome. json');
+          let manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+          // Remove automa.site and vercel from content scripts
+          if (manifest.content_scripts) {
+            manifest.content_scripts. forEach(script => {
+              if (script.matches) {
+                script.matches = script.matches.filter(m =>
+                  ! m.includes('automa.site') && !m.includes('automa.vercel')
+                );
+              }
+            });
+          }
+
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+          console.log('✅ Patched manifest.chrome.json successfully');
+          MANIFESTEOF
+
+          node patch-manifest.js
+          rm patch-manifest.js
+
       - name: Install dependencies
         run: npm install
-      
-      - name: Build
+
+      - name: Build extension
         run: npm run build
-      
-      - name: Create ZIP
+
+      - name: Create ZIP file
         run: |
           cd build
           zip -r ../automa-private-variant.zip . 
-          cd ..
-      
-      - name: Upload artifact
+          cd .. 
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v3
-        with: 
+        with:
           name: automa-private-variant
           path: automa-private-variant.zip
           retention-days: 30
