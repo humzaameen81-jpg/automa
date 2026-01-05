@@ -1,0 +1,54 @@
+name: Build Automa Private Variant
+
+on: 
+  push:
+    branches:  [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on:  ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version:  '18'
+      
+      - name: Create localApi.js
+        run: |
+          mkdir -p src/utils
+          cat > src/utils/localApi. js << 'EOF'
+          // [paste the entire localApi.js content here]
+          EOF
+      
+      - name:  Patch api.js
+        run: node -e "
+          const fs = require('fs');
+          let content = fs.readFileSync('src/utils/api.js', 'utf8');
+          if (!content.includes('USE_LOCAL_STORAGE_ONLY')) {
+            content = \"const USE_LOCAL_STORAGE_ONLY = true;\\n\" + content;
+          }
+          fs.writeFileSync('src/utils/api.js', content);
+        "
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Create ZIP
+        run: |
+          cd build
+          zip -r ../automa-private-variant.zip . 
+          cd ..
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with: 
+          name: automa-private-variant
+          path: automa-private-variant.zip
+          retention-days: 30
