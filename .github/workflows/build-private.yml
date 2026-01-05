@@ -270,40 +270,63 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Locating built extension folder (by manifest*.json)..."
+          echo "📦 Locating built extension folder..."
 
           echo "Top-level folders:"
           ls -la
 
-          echo "Searching for manifest*.json (depth 12)..."
-          MANIFEST_PATH=$(find . -maxdepth 12 -type f \
+          # 1) Try to find a built manifest outside src/
+          MANIFEST_PATH=$(find . -maxdepth 20 -type f \
             \( -name "manifest.json" -o -name "manifest.*.json" -o -name "manifest_*.json" \) \
             -not -path "./node_modules/*" \
             -not -path "./.git/*" \
+            -not -path "./src/*" \
             | head -n 1)
 
-          if [ -z "$MANIFEST_PATH" ]; then
-            echo "❌ No manifest file found after build."
-            echo "Listing any manifest-like files:"
-            find . -maxdepth 12 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print
-            echo "Listing likely output folders:"
-            find . -maxdepth 5 -type d \( -name dist -o -name build -o -name out -o -name output -o -name release \) -print
-            exit 1
-          fi
+          if [ -n "$MANIFEST_PATH" ]; then
+            OUTDIR=$(dirname "$MANIFEST_PATH")
+            echo "✅ Found build manifest at: $MANIFEST_PATH"
+            echo "✅ Using output folder: $OUTDIR"
+          else
+            echo "⚠️ No manifest found outside src/. Trying to detect build output by known built files..."
 
-          OUTDIR=$(dirname "$MANIFEST_PATH")
-          echo "✅ Found manifest file at: $MANIFEST_PATH"
-          echo "✅ Using output folder: $OUTDIR"
+            # 2) Find a built popup/newtab html (these are present in the built extension output)
+            BUILT_HTML=$(find . -maxdepth 20 -type f \
+              \( -path "*/popup/index.html" -o -path "*/newtab/index.html" -o -path "*/background/index.html" -o -path "*/offscreen/index.html" \) \
+              -not -path "./node_modules/*" \
+              -not -path "./.git/*" \
+              | head -n 1)
+
+            if [ -z "$BUILT_HTML" ]; then
+              echo "❌ Could not locate build output."
+              echo "Showing any manifest-like files (including src):"
+              find . -maxdepth 20 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print | head -n 50
+              echo ""
+              echo "Showing any popup/newtab html files:"
+              find . -maxdepth 20 -type f \( -path "*/popup/index.html" -o -path "*/newtab/index.html" \) -print | head -n 50
+              exit 1
+            fi
+
+            OUTDIR=$(dirname "$BUILT_HTML")
+            # If we found popup/index.html, the extension root is one level up from popup/
+            OUTDIR=$(dirname "$OUTDIR")
+
+            echo "✅ Found built HTML at: $BUILT_HTML"
+            echo "✅ Using output folder: $OUTDIR"
+          fi
 
           echo "Contents of output folder:"
           ls -la "$OUTDIR"
 
+          ZIP_NAME="automa-private-variant.zip"
+          rm -f "$ZIP_NAME"
+
           cd "$OUTDIR"
-          zip -r "../../automa-private-variant.zip" .
+          zip -r "../$ZIP_NAME" .
           cd -
 
           echo "✅ ZIP created:"
-          ls -la automa-private-variant.zip
+          ls -la "$ZIP_NAME"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
