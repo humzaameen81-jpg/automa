@@ -270,37 +270,36 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Finding build output..."
-          echo "Folders in repo root:"
-          ls -la
+          echo "📦 Locating built extension folder (by manifest.json)..."
 
-          # Prefer common extension output folders FIRST
-          if [ -d dist ]; then OUTDIR=dist;
-          elif [ -d build ]; then OUTDIR=build;
-          elif [ -d extension ]; then OUTDIR=extension;
-          elif [ -d output ]; then OUTDIR=output;
-          else
-            echo "❌ Could not find dist/build/extension/output."
-            echo "Here are folders (depth 2):"
-            find . -maxdepth 2 -type d -print
+          echo "Searching for manifest.json (depth 6)..."
+          MANIFEST_PATH=$(find . -maxdepth 6 -type f -name manifest.json | head -n 1)
+
+          if [ -z "$MANIFEST_PATH" ]; then
+            echo "❌ No manifest.json found after build."
+            echo "Top-level folders:"
+            ls -la
+            echo "Folders (depth 3):"
+            find . -maxdepth 3 -type d -print
             exit 1
           fi
 
-          # Safety check: never zip node_modules
-          if [ -d "$OUTDIR/node_modules" ]; then
-            echo "❌ '$OUTDIR' contains node_modules, so it's not the build output folder."
-            echo "Showing candidates that contain manifest.json (common in extensions):"
-            find . -maxdepth 4 -name manifest.json -print
-            exit 1
-          fi
-
+          OUTDIR=$(dirname "$MANIFEST_PATH")
+          echo "✅ Found manifest.json at: $MANIFEST_PATH"
           echo "✅ Using output folder: $OUTDIR"
-          echo "Contents of $OUTDIR:"
+
+          # Safety: don't zip repo root or node_modules
+          if [ "$OUTDIR" = "." ] || [[ "$OUTDIR" == *"node_modules"* ]]; then
+            echo "❌ Output folder looks wrong: $OUTDIR"
+            exit 1
+          fi
+
+          echo "Contents of output folder:"
           ls -la "$OUTDIR"
 
           cd "$OUTDIR"
-          zip -r "../automa-private-variant.zip" .
-          cd ..
+          zip -r "../../automa-private-variant.zip" .
+          cd -
 
           echo "✅ ZIP created:"
           ls -la automa-private-variant.zip
