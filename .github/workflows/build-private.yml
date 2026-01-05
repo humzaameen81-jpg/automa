@@ -270,22 +270,34 @@ jobs:
 
       - name: Create ZIP file
         run: |
-          echo "📦 Locating built extension folder (by manifest*.json)..."
+          echo "📦 Locating built extension folder..."
 
-          MANIFEST_PATH=$(find . -maxdepth 12 -type f \
+          # Find manifest in typical BUILD output folders only
+          MANIFEST_PATH=$(find . -maxdepth 15 -type f \
             \( -name "manifest.json" -o -name "manifest.*.json" -o -name "manifest_*.json" \) \
             -not -path "./node_modules/*" \
             -not -path "./.git/*" \
+            -not -path "./src/*" \
+            -not -path "./business/*" \
+            | grep -E "./(dist|build|release|out|output)/" \
             | head -n 1)
 
           if [ -z "$MANIFEST_PATH" ]; then
-            echo "❌ No manifest file found after build."
-            find . -maxdepth 12 -type f -iname "*manifest*.json" -not -path "./node_modules/*" -print
+            echo "❌ No manifest found inside dist/build/release/out/output."
+            echo "Here are all manifest-like files found (excluding node_modules):"
+            find . -maxdepth 15 -type f -iname "*manifest*.json" \
+              -not -path "./node_modules/*" \
+              -not -path "./.git/*" \
+              | head -n 50
+            echo ""
+            echo "Here are folders that exist (depth 3):"
+            find . -maxdepth 3 -type d -print
             exit 1
           fi
 
           OUTDIR=$(dirname "$MANIFEST_PATH")
-          echo "✅ Using output folder: $OUTDIR"
+          echo "✅ Found build manifest at: $MANIFEST_PATH"
+          echo "✅ Zipping folder: $OUTDIR"
 
           ZIP_NAME="automa-private-variant.zip"
           rm -f "$ZIP_NAME"
